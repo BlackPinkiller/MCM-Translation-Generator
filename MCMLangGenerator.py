@@ -286,15 +286,17 @@ class MainWindow(QMainWindow):
         selected_items = self.table_form.selectedItems()
         if not selected_items:
             return
-        rows_to_delete = set()
+        rows_to_delete = {}
         for item in selected_items:
-            rows_to_delete.add(item.row())
-        for row in rows_to_delete:
+            if item.row() not in rows_to_delete.keys():
+                rows_to_delete[item.row()] = item
+        for _, item in rows_to_delete.items():
+            row = item.row()
             item = self.table_form.item(row, 1)
             text = self.table_form.item(row, 0).text()
             self.modified_lang_text.pop(item.text())
             self.converted_json = self.delete_value_from_json(self.converted_json, item.text(), text)
-            self.table_form.removeRow(item.row())
+            self.table_form.removeRow(row)
         self.table_form.clearSelection()
 
     def delete_value_from_json(self, data, target, original, path=None,):
