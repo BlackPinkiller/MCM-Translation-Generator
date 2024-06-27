@@ -1,10 +1,13 @@
+import html
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QDialog, QVBoxLayout, QWidget
 import LangLoader
 import SettingManager
 import MsgHandler
-
+"""
+    下个功能, special font
+    选项: 过滤, 显示, 显示并去除特殊符号
+"""
 class SettingsWindow(QDialog):
     restart_UI = pyqtSignal()
     lang_codes = ['En','Cn','Ja','Fr','De','It','Ru','Es','EsMx','Pi','PtBr']
@@ -24,6 +27,7 @@ class SettingsWindow(QDialog):
         self.main_layout = QVBoxLayout()
         self.UIlang_layout = QVBoxLayout()
         self.lang_layout = QVBoxLayout()
+        self.special_filter_layout = QVBoxLayout()
         self.grid_layout = QGridLayout()
 
 
@@ -39,10 +43,30 @@ class SettingsWindow(QDialog):
         self.UIlang_droplist.currentTextChanged.connect(self.selectionChanged)
         self.UIlang_droplist.setStyleSheet("color: #333333; ")
         self.UIlang_layout.addWidget(self.UIlang_droplist)
-        
-        self.main_layout.addStretch()  # add strech to push the buttons to the bottom
 
-        
+
+        # options to filter special characters like <font> </font>
+        # option 1: exclude all
+        # option 2: show
+        # option 3: show and remove format
+        self.special_filter = QGroupBox(LangLoader.text("Setting_Special_Filter_Label","Special Format Filter"),self)
+        self.special_filter.setLayout(self.special_filter_layout)
+
+        option_exclude = LangLoader.text("Setting_Special_Filter_Exclude","Exclude")
+        option_include = LangLoader.text("Setting_Special_Filter_Include","Include")
+        option_include_remove = LangLoader.text("Setting_Special_Filter_Include_Remove","Include But Remove Format")
+        special_filter_droplist_options = [option_exclude, option_include, option_include_remove]
+        self.special_filter_label = QLabel(html.escape(LangLoader.text("Setting_Special_Filter_Help","Filter the special formats or not. e.g: <p>example</p>")), self)
+        self.special_filter_layout.addWidget(self.special_filter_label)
+        self.special_filter_droplist = QComboBox(self)
+        self.special_filter_droplist.addItems(special_filter_droplist_options)
+        self.special_filter_droplist.setCurrentIndex(self.Setting_menu.get("special_filter"))
+        self.special_filter_droplist.currentIndexChanged.connect(self.filterSelectionChanged)
+        self.special_filter_droplist.setStyleSheet("color: #333333; ")
+        self.special_filter_layout.addWidget(self.special_filter_droplist)
+
+
+
         # Lang code selection for generate translation text files
         self.lang_group_box = QGroupBox(LangLoader.text("Setting_Lang_Header", "Translation Text"),self)
         self.lang_group_box.setLayout(self.lang_layout)
@@ -64,10 +88,14 @@ class SettingsWindow(QDialog):
         self.lang_layout.addLayout(self.grid_layout)
 
 
+
         self.main_layout.addWidget(self.UIlang_group_box)
+        self.main_layout.addStretch()
+        self.main_layout.addWidget(self.special_filter)
+        self.main_layout.addStretch()
         self.main_layout.addWidget(self.lang_group_box)
         self.main_layout.addStretch()  # add strech to push the buttons to the bottom
-        spacer = QWidget()  # 或者 QLabel("")
+        spacer = QWidget() 
         spacer.setFixedSize(10, 10)
         self.main_layout.addWidget(spacer)
 
@@ -90,10 +118,13 @@ class SettingsWindow(QDialog):
         self.setLayout(self.main_layout)
     
 
-    def selectionChanged(self, index):
-        selected_text = self.UIlang_droplist.currentText()
+    def selectionChanged(self, selected_text):
         if self.Setting_menu and "current_UILang" in self.Setting_menu.keys():
             self.Setting_menu["current_UILang"] = selected_text
+
+    def filterSelectionChanged(self, selected_index):
+        if self.Setting_menu and "special_filter" in self.Setting_menu.keys():
+            self.Setting_menu["special_filter"] = selected_index
         
 
     def checkbox_state_changed(self, state):

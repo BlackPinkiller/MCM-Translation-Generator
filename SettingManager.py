@@ -5,7 +5,8 @@ settings = 1
 default_setting = { 
     "window_pos" : [-1, -1, -1, -1],
     "current_UILang" : 'English',
-    "lang_codes" : ['En']
+    "lang_codes" : ['En'],
+    "special_filter": 2
     }
 
 loaded_setting = {}

@@ -1,11 +1,13 @@
-import datetime
-import json
 import os
-import uuid
+import re
+import html
+import json
 import chardet
-import MsgHandler
+import datetime
 from datetime import datetime
+import MsgHandler
 import LangLoader
+import SettingManager
 
 mcmdict = ["text","param","displayName","help","pageDisplayName"]
 mcm_lang_text = {}
@@ -123,7 +125,7 @@ def readMCM(mcm = dict, modName = None):
     return converted_mcm
 
 
-def traverse(obj, path=None, parentName = None):
+def traverse(data_set, path=None, parentName = None):
     """
     Traverse and process the MCM data.
 
@@ -135,20 +137,23 @@ def traverse(obj, path=None, parentName = None):
     global mcm_lang_text
     global mcmdict
     global mcm_lang_key_stats
+    special_setting = SettingManager.loaded_setting.get("special_filter")
     if path is None:
         path = []
-    if isinstance(obj, dict):
+    if isinstance(data_set, dict):
         temp_dict = {}
-        for key, value in obj.items(): # Iterate over dictionary items
+        for key, value in data_set.items(): # Iterate over dictionary items
             # define reusable variables
             temp_dict[key] = value 
-            key_set = obj.keys()
             lang_keyword = path + [key]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # waiting to implement optional value
-            if key in mcmdict and '<' not in value: 
+            if key in mcmdict: 
+                # Exclude special format is setting is "Exclude"
+                if isContainHtmlTags(value) and special_setting == 0:
+                    continue
 
-                lang_keyword, id_good_stats = getKeyword(full_set=obj,suffix=key,lang_keyword=lang_keyword,path=path)
+                lang_keyword, id_good_stats = getKeyword(full_set=data_set,suffix=key,lang_keyword=lang_keyword,path=path)
                 """
                 # if it has ID or Type, use it first
                 # mark this data if it's not using id as keyword for further determine
@@ -176,7 +181,7 @@ def traverse(obj, path=None, parentName = None):
                 # Store the value in mcm_lang_text with lang_keyword
                 # Save keyword and value to lang text dictionary
                 """
-                mcm_lang_text[lang_keyword] = value 
+                mcm_lang_text[lang_keyword] = specialFormatHandler(value, special_setting)
                 # store orignal text and converted keyword to dict for user to preview
                 mcm_lang_key_stats[lang_keyword] = id_good_stats
                 # Replace the value with new language keyword after
@@ -186,7 +191,7 @@ def traverse(obj, path=None, parentName = None):
             # better if mcm update a big difference, as long as the id's not change
             # it will keep consist 
             elif key == "valueOptions":
-                temp_key, _ = getKeyword(full_set=obj,suffix="",lang_keyword=lang_keyword,path=path)
+                temp_key, _ = getKeyword(full_set=data_set,suffix="",lang_keyword=lang_keyword,path=path)
                 temp_key = temp_key.removeprefix('$').removesuffix("_")
                 if lang_keyword != temp_key:
                     value = traverse(value, path + [key], temp_key)
@@ -197,20 +202,20 @@ def traverse(obj, path=None, parentName = None):
             temp_dict[key] = traverse(value, lang_keyword)
         # Return the processed dictionary
         return temp_dict 
-    elif isinstance(obj, list):
+    elif isinstance(data_set, list):
         temp_list = []
-        for index, item in enumerate(obj):
+        for index, item in enumerate(data_set):
             if parentName:
                 # Create language keyword for option
                 lang_keyword = makeLangKeyword([parentName] + path, index)
                 temp_list.append(lang_keyword)
                 # Store the item in mcm_lang_text with lang_keyword
-                mcm_lang_text[lang_keyword] = item
+                mcm_lang_text[lang_keyword] = specialFormatHandler(item,special_setting)
                 mcm_lang_key_stats[lang_keyword] = 3
             else:
                 temp_list.append(traverse(item, path + [index]))
         return temp_list # Return the processed list
-    return obj
+    return data_set
 
 def getKeyword(full_set, suffix, lang_keyword, path):
     key_set = full_set.keys()
@@ -231,6 +236,34 @@ def getKeyword(full_set, suffix, lang_keyword, path):
     if "isplayName" in suffix:
         id_good_stats = 0
     return lang_keyword, id_good_stats
+
+
+def makeLangKeyword(path, pathkey = None):
+    """
+    Create a language keyword from the given path and path key to make it unique.
+
+    :param path: The current traversal path as a list.
+    :param pathkey: The current key or index being processed.
+    :return: A string representing the language keyword.
+    """
+    # Join path and pathkey with underscores and prefix with '$'
+    if pathkey != None:
+        return '$' + '_'.join(map(str, path + [pathkey])).replace(':','_')
+    else:
+        return '$' + '_'.join(map(str, path)).replace(':','_')
+    
+def specialFormatHandler(text, option):
+    if option == 2:
+        unescaped_text = html.unescape(text)
+        plain_text = re.sub(r'<[^>]*>', '', unescaped_text)
+        return plain_text
+    else:
+        return text
+    
+def isContainHtmlTags(text):
+    pattern = re.compile(r'<[^>]+>')
+    return bool(pattern.search(str(text)))
+
 
 def replaceModifiedKey(obj, replace_key, path=None, ):
     """
@@ -264,18 +297,3 @@ def replaceModifiedKey(obj, replace_key, path=None, ):
                 temp_list.append(replaceModifiedKey(item, replace_key, path + [index]))
         return temp_list # Return the processed list
     return obj
-
-
-def makeLangKeyword(path, pathkey = None):
-    """
-    Create a language keyword from the given path and path key to make it unique.
-
-    :param path: The current traversal path as a list.
-    :param pathkey: The current key or index being processed.
-    :return: A string representing the language keyword.
-    """
-    # Join path and pathkey with underscores and prefix with '$'
-    if pathkey != None:
-        return '$' + '_'.join(map(str, path + [pathkey])).replace(':','_')
-    else:
-        return '$' + '_'.join(map(str, path)).replace(':','_')
